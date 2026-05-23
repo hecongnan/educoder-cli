@@ -1,0 +1,19 @@
+[project]
+name = "educoder-cli"
+version = "1.0.0"
+description = "Head Song (EduCoder) platform CLI tool - automate classroom, experiment, and submission workflows"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "requests>=2.28.0",
+    "click>=8.0.0",
+    "rich>=13.0.0",
+    "pycryptodome>=3.15.0",
+]
+
+[project.scripts]
+educoder = "cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
