@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-uv tool install git+https://github.com/lihaoze123/educoder-cli
+uv tool install git+https://github.com/hecongnan/educoder-cli
 # OR from local clone:
 pip install -e .
 ```

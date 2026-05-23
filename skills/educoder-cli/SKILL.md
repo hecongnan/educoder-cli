@@ -16,7 +16,7 @@ Read `references/educoder-cli.md` for commands, selector rules, JSON fields, and
 1. Install the CLI (or confirm it's already available):
 
    ```bash
-   uv tool install git+https://github.com/lihaoze123/educoder-cli
+   uv tool install git+https://github.com/hecongnan/educoder-cli
    ```
 
    Or from local clone:
