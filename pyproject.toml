@@ -1,19 +1,22 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
 [project]
 name = "educoder-cli"
 version = "1.0.0"
-description = "Head Song (EduCoder) platform CLI tool - automate classroom, experiment, and submission workflows"
+description = "头歌 / Educoder API CLI — 课堂列表、实验列表、代码提交与自动评测"
 readme = "README.md"
-requires-python = ">=3.8"
+license = "MIT"
+requires-python = ">=3.10"
 dependencies = [
-    "requests>=2.28.0",
-    "click>=8.0.0",
+    "httpx>=0.28.1",
     "rich>=13.0.0",
-    "pycryptodome>=3.15.0",
+    "typer>=0.15.0",
 ]
 
 [project.scripts]
-educoder = "cli:main"
+educoder = "educoder_cli.cli:app"
 
-[build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+[tool.hatch.build.targets.wheel]
+packages = ["src/educoder_cli"]

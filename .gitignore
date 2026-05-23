@@ -1,11 +1,10 @@
 __pycache__/
 *.py[cod]
-*.so
-.env
-.session.json
-.cookies.json
 *.egg-info/
 dist/
 build/
+credentials.json
+.session.json
+.cookies.json
 .venv/
 venv/
