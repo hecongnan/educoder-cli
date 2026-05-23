@@ -1,0 +1,9 @@
+{
+  "skills": {
+    "educoder-cli": {
+      "name": "educoder-cli",
+      "description": "Solve EduCoder/Touge homework tasks with educoder-cli",
+      "path": "skills/educoder-cli/SKILL.md"
+    }
+  }
+}

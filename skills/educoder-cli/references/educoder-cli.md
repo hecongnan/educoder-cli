@@ -1,40 +1,90 @@
-# educoder-cli 命令参考
+# educoder-cli Command Reference
 
-## 安装与运行
+## Install
 
-从项目目录运行（已安装 httpx, rich, typer）：
 ```bash
-cd C:\Users\hecon\educoder-cli
+uv tool install git+https://github.com/lihaoze123/educoder-cli
+# OR from local clone:
+pip install -e .
+```
+
+## CLI Discovery
+
+Try each, use the first that works (record as `$CLI`):
+```bash
+educoder --help
+uv run educoder --help
 python main.py --help
 ```
 
-## 命令
+## Commands
 
 ```bash
-python main.py status --json
-python main.py courses --json
-python main.py homeworks --course <id|identifier|name> --json
-python main.py task --course <course> --homework <id|name> --json
-python main.py code --course <course> --homework <homework> --output <file> --force --json
-python main.py submit --course <course> --homework <homework> --file <file> --timeout 60 --json
+$CLI status --json
+$CLI courses --json
+$CLI homeworks --course <id|identifier|name> --json
+$CLI task --course <course> --homework <id|name> --json
+$CLI code --course <course> --homework <homework> --output <file> --force --json
+$CLI submit --course <course> --homework <homework> --file <file> --timeout 60 --json
 ```
 
-## 选择器规则
+## Selector Rules
 
-- Course: 支持 ID、identifier、名称、名称片段
-- Homework: 支持 ID、名称、名称片段
-- 模糊匹配到多个时需用户选择
+- **Course**: matches ID → exact identifier → exact name → name substring
+- **Homework**: matches ID → exact name → name substring
+- Ambiguous results are local errors; present candidates and ask user to choose
 
-## JSON 关键字段
+## JSON Fields
 
-- `course.identifier`: 稳定选择器
-- `homework.homework_id`: 稳定选择器
-- `homework.finished_challenge_count / challenge_count`: 完成进度
-- `task.challenge.path`: 远端文件路径
-- `task.challenge.task_pass`: 题面描述
-- `task.last_compile_output`: 最近编译反馈
-- `task.game.status`: 0=未开始 1=评测中 2=通过 3=未通过
-- `task.test_sets[].output`: 期望输出
-- `task.test_sets[].actual_output`: 实际输出
-- `task.test_sets[].compile_success`: 编译结果
-- `task.next_game`: 下一关 game identifier
+### courses
+- `id`, `name`, `identifier`, `school`, `tasks_count`
+
+### homeworks
+- `homework_id`: stable selector
+- `name`, `shixun_identifier`, `myshixun_identifier`
+- `challenge_count`, `finished_challenge_count`: progress
+- `status`: e.g. `["已结束"]`, `["提交中"]`
+- `end_time`
+
+### task
+- `challenge.path`: remote answer file path
+- `challenge.subject`: challenge title
+- `challenge.task_pass`: problem statement (HTML/Markdown)
+- `challenge.position`, `challenge.score`
+- `game.status`: 0=未开始 1=评测中 2=通过 3=未通过
+- `game.final_score`, `game.accuracy`
+- `homework_common_id`, `homework_common_name`
+- `prev_game`, `next_game`: multi-level navigation
+- `last_compile_output`: recent compiler feedback
+- `time_limit`: seconds
+- `test_sets[]`:
+  - `result`: true/false/null
+  - `output`: expected output
+  - `actual_output`: actual output after evaluation
+  - `compile_success`: compile result
+  - `is_public`: whether this test is visible
+  - `ts_time`, `ts_mem`: time/memory metrics
+
+### code
+- `path`: remote file path
+- `content`: file content (when no `--output`)
+- `output`: local file path (when `--output`)
+- `written`: true when file was created
+
+### submit
+- `passed`: true/false/null (null = no-wait mode)
+- `task_detail`: full task detail after evaluation
+- `test_sets[]`: evaluation results
+
+## Exit Codes
+
+- 0: success (submit passes, or --no-wait accepted)
+- 1: API error, context error, file error, or evaluation failed
+- 2: missing credentials
+
+## Multi-Level Tasks
+
+After a `submit` passes, check `task_detail.next_game`. If non-null:
+1. Re-run `task` to get the next level context
+2. Repeat: code → solve → submit
+3. Continue until `next_game` is null

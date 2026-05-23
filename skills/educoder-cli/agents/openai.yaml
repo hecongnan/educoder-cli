@@ -1,0 +1,4 @@
+interface:
+  display_name: "EduCoder CLI"
+  short_description: "Solve EduCoder homework with the CLI"
+  default_prompt: "Use $educoder-cli to solve my current EduCoder homework task."
