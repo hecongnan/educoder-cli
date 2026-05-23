@@ -40,7 +40,10 @@ _HTML_TAG = __import__("re").compile(r"</?[A-Za-z][^>]*>")
 
 
 class _HTMLToText(HTMLParser):
-    _BLOCK: ClassVar[set[str]] = {"blockquote", "br", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "ol", "p", "pre", "tr", "ul"}
+    _BLOCK: ClassVar[set[str]] = {
+        "blockquote", "br", "div", "h1", "h2", "h3", "h4", "h5", "h6",
+        "li", "ol", "p", "pre", "tr", "ul",
+    }
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -64,7 +67,7 @@ class _HTMLToText(HTMLParser):
 
 
 def _require_credentials(zzud, autologin, session) -> tuple[str, str, str]:
-    if not zzud or not autologin or not session:
+    if not zzud or not session:
         try:
             stored = load_credentials()
         except ValueError as exc:
@@ -132,14 +135,19 @@ def _format_problem_text(value: str) -> str:
     return "\n".join(l for l in normalized.splitlines() if l.strip().casefold() != "[toc]").strip()
 
 
-def _render_task_detail(task: TaskDetail) -> None:
-    table = Table(title="Task")
+# ---- Render functions ----
+
+def _render_task_detail(task: TaskDetail, *, title: str = "Task") -> None:
+    table = Table(title=title)
     table.add_column("Field"); table.add_column("Value")
     table.add_row("Homework", escape(task.homework_common_name))
     table.add_row("Challenge", escape(task.challenge.subject))
     table.add_row("Path", escape(task.challenge.clean_path))
     table.add_row("Status", _game_status(task.game.status))
     table.add_row("Score", str(task.game.final_score))
+    table.add_row("Time Limit", str(task.time_limit))
+    if task.last_compile_output:
+        table.add_row("Compile Output", escape(_truncate(task.last_compile_output, 300)))
     console.print(table)
     formatted = _format_problem_text(task.challenge.task_pass)
     if formatted:
@@ -151,9 +159,75 @@ def _render_task_detail(task: TaskDetail) -> None:
         ts_table.add_column("Expected")
         ts_table.add_column("Actual")
         for i, ts in enumerate(task.test_sets, 1):
-            ts_table.add_row(str(i), "pass" if ts.result else "fail" if ts.result is not None else "",
-                             escape(_truncate(ts.output, 120)), escape(_truncate(ts.actual_output, 120)))
+            ts_table.add_row(
+                str(i),
+                "pass" if ts.result else "fail" if ts.result is not None else "",
+                escape(_truncate(ts.output, 120)),
+                escape(_truncate(ts.actual_output, 120)),
+            )
         console.print(ts_table)
+
+
+def _render_submission(result: dict[str, Any]) -> None:
+    passed = result.get("passed")
+    if passed is None:
+        console.print("[green]Submission triggered; evaluation was not waited.[/green]")
+    elif passed:
+        console.print("[green]Evaluation passed.[/green]")
+    else:
+        console.print("[red]Evaluation failed.[/red]")
+    task = result.get("task_detail")
+    if isinstance(task, TaskDetail):
+        _render_task_detail(task, title="Submission")
+        return
+    test_sets = result.get("test_sets", [])
+    if test_sets:
+        ts_table = Table(title="Test Sets")
+        ts_table.add_column("#", justify="right")
+        ts_table.add_column("Result")
+        ts_table.add_column("Expected")
+        ts_table.add_column("Actual")
+        for i, ts in enumerate(test_sets, 1):
+            ts_table.add_row(
+                str(i),
+                "pass" if ts.result else "fail" if ts.result is not None else "",
+                escape(_truncate(ts.output, 120)),
+                escape(_truncate(ts.actual_output, 120)),
+            )
+        console.print(ts_table)
+
+
+def _submission_to_dict(result: dict[str, Any], course: Course, homework: HomeworkCommon) -> dict[str, object]:
+    passed = result.get("passed")
+    task = result.get("task_detail")
+    test_sets = result.get("test_sets", [])
+    out: dict[str, object] = {
+        "passed": passed,
+        "course": {"id": course.id, "name": course.name, "identifier": course.identifier},
+        "homework": {
+            "homework_id": homework.homework_id, "name": homework.name,
+            "challenge_count": homework.challenge_count,
+            "finished_challenge_count": homework.finished_challenge_count,
+        },
+    }
+    if isinstance(task, TaskDetail):
+        out["task"] = {
+            "homework_common_name": task.homework_common_name,
+            "challenge": task.challenge.subject,
+            "path": task.challenge.clean_path,
+            "status": _game_status(task.game.status),
+            "score": task.game.final_score,
+            "last_compile_output": task.last_compile_output,
+        }
+        out["test_sets"] = [
+            {
+                "result": ts.result, "output": ts.output,
+                "actual_output": ts.actual_output, "is_public": ts.is_public,
+                "compile_success": ts.compile_success,
+            }
+            for ts in test_sets
+        ]
+    return out
 
 
 # ---- Commands ----
@@ -175,11 +249,14 @@ def login(account: LoginOption, password: PasswordOption, json_output: JsonOptio
         _handle_cli_error(exc)
 
     if json_output:
-        _print_json({"user": {"user_id": result.user_id, "login": result.login, "name": result.name,
-                     "identity": result.identity, "school": result.school, "grade": result.grade},
-                     "saved": True, "credentials_path": str(cred_path)})
+        _print_json({
+            "user": {"user_id": result.user_id, "login": result.login, "name": result.name,
+                      "identity": result.identity, "school": result.school, "grade": result.grade},
+            "saved": True, "credentials_path": str(cred_path),
+        })
     else:
-        console.print(f"[green]Logged in as {escape(result.name or result.login or result.user_id)}.[/green]")
+        label = result.name or result.login or result.user_id
+        console.print(f"[green]Logged in as {escape(label)}.[/green]")
 
 
 @app.command()
@@ -212,8 +289,8 @@ def courses(zzud: ZzudOption = None, autologin: AutologinOption = None, session:
         _handle_cli_error(exc)
 
     if json_output:
-        _print_json([{"id": c.id, "name": c.name, "identifier": c.identifier, "school": c.school,
-                       "tasks_count": c.tasks_count} for c in course_list])
+        _print_json([{"id": c.id, "name": c.name, "identifier": c.identifier,
+                       "school": c.school, "tasks_count": c.tasks_count} for c in course_list])
     else:
         table = Table(title="Courses")
         table.add_column("ID", justify="right"); table.add_column("Name")
@@ -236,12 +313,14 @@ def homeworks(course: CourseOption, zzud: ZzudOption = None, autologin: Autologi
         _handle_cli_error(exc)
 
     if json_output:
-        _print_json({"course": {"id": selected.id, "name": selected.name, "identifier": selected.identifier},
-                     "homeworks": [{"homework_id": h.homework_id, "name": h.name,
-                                    "challenge_count": h.challenge_count,
-                                    "finished_challenge_count": h.finished_challenge_count,
-                                    "shixun_finished_status": h.shixun_finished_status,
-                                    "status": h.status, "end_time": h.end_time} for h in hw_list]})
+        _print_json({
+            "course": {"id": selected.id, "name": selected.name, "identifier": selected.identifier},
+            "homeworks": [{"homework_id": h.homework_id, "name": h.name,
+                            "challenge_count": h.challenge_count,
+                            "finished_challenge_count": h.finished_challenge_count,
+                            "shixun_finished_status": h.shixun_finished_status,
+                            "status": h.status, "end_time": h.end_time} for h in hw_list],
+        })
     else:
         table = Table(title=f"Homeworks - {selected.name}")
         table.add_column("ID", justify="right"); table.add_column("Name")
@@ -260,15 +339,20 @@ def task_command(course: CourseOption, homework: HomeworkOption, zzud: ZzudOptio
     auth = _require_credentials(zzud, autologin, session)
     try:
         with EduCoderClient(*auth) as client:
-            selected_course, selected_homework = _select_course_and_homework(client, course, homework)
+            _sel_c, _sel_h = _select_course_and_homework(client, course, homework)
             detail = client.get_current_context()
     except (EduCoderAPIError, ValueError) as exc:
         _handle_cli_error(exc)
 
     if json_output:
-        _print_json({"course": selected_course.identifier, "homework": selected_homework.homework_id,
-                     "task": {"challenge": detail.challenge.subject, "path": detail.challenge.clean_path,
-                              "status": _game_status(detail.game.status), "score": detail.game.final_score}})
+        _print_json({
+            "course": _sel_c.identifier, "homework": _sel_h.homework_id,
+            "task": {
+                "challenge": detail.challenge.subject, "path": detail.challenge.clean_path,
+                "status": _game_status(detail.game.status), "score": detail.game.final_score,
+                "last_compile_output": detail.last_compile_output,
+            },
+        })
     else:
         _render_task_detail(detail)
 
@@ -314,25 +398,19 @@ def submit(course: CourseOption, homework: HomeworkOption,
            json_output: JsonOption = False) -> None:
     """Submit local code and wait for evaluation."""
     auth = _require_credentials(zzud, autologin, session)
+    selected_course = selected_homework = None
     try:
         source = sys.stdin.read() if file == "-" else Path(file).read_text(encoding="utf-8")
         with EduCoderClient(*auth) as client:
-            _select_course_and_homework(client, course, homework)
+            selected_course, selected_homework = _select_course_and_homework(client, course, homework)
             result = client.submit(source, wait=not no_wait, poll_interval=poll_interval, timeout=timeout)
     except (EduCoderAPIError, ValueError) as exc:
         _handle_cli_error(exc)
 
     passed = result.get("passed")
     if json_output:
-        _print_json({"passed": passed, "test_sets": [
-            {"result": ts.result, "output": ts.output, "actual_output": ts.actual_output}
-            for ts in (result.get("test_sets") or [])]})
+        _print_json(_submission_to_dict(result, selected_course, selected_homework))
     else:
-        if passed is None:
-            console.print("[green]Submitted (no wait).[/green]")
-        elif passed:
-            console.print("[green]Passed![/green]")
-        else:
-            console.print("[red]Failed.[/red]")
+        _render_submission(result)
     if passed is False:
         raise typer.Exit(1)
