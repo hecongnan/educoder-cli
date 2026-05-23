@@ -8,3 +8,10 @@ credentials.json
 .cookies.json
 .venv/
 venv/
+# Temporary answer files
+step7.sql
+stu.sql
+tmp_level.sql
+test1.sql
+test2.sql
+*.sql.tmp
