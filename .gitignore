@@ -15,3 +15,9 @@ tmp_level.sql
 test1.sql
 test2.sql
 *.sql.tmp
+# Debug/test scripts
+debug_*.py
+solve_*.py
+complete_*.py
+read_challenges.py
+test_ch1*.py
