@@ -26,6 +26,7 @@
 - [项目结构](#项目结构)
 - [API 逆向说明](#api-逆向说明)
 - [已知问题](#已知问题)
+- [自动提交脚本（educoder_auto.py）](#自动提交脚本educoder_autopy)
 - [License](#license)
 
 ## 安装
@@ -340,6 +341,62 @@ educoder-cli/
 ### Cookie 过期
 
 浏览器 Cookie 有时效限制。过期后需重新从浏览器提取 `_educoder_session` 和 `autologin_trustie`，更新凭证文件。
+
+## 自动提交脚本（educoder_auto.py）
+
+`educoder_auto.py` 是基于 `educoder-cli` 的批量自动提交工具，可以一次性完成多个实验的所有未通过关卡。
+
+### 用法
+
+```bash
+# 查看实验状态（不提交）
+python educoder_auto.py --dry-run
+
+# 自动提交所有未完成的实验
+python educoder_auto.py
+
+# 指定课程
+python educoder_auto.py --course GXV5CTWD
+```
+
+### 工作原理
+
+1. 从 `%APPDATA%/educoder-cli/credentials.json` 加载凭证
+2. 获取课程下所有实验的完成状态
+3. 对未完成的实验，逐关卡提交答案
+4. 答案匹配优先级：`ANSWERS` 字典（按 challenge_id）→ 代码模板（从 API 获取）
+5. 已通过的关卡自动跳过
+
+### 答案配置
+
+在 `educoder_auto.py` 的 `ANSWERS` 字典中配置答案，key 为 `challenge_id`：
+
+```python
+ANSWERS = {
+    # challenge_id: 完整的 Begin/End 包裹代码
+    3863627: (
+        "/****请在此编写代码，操作完毕之后点击评测******/\n\n"
+        "/**********Begin**********/\n"
+        "GRANT ALL PRIVILEGES ON teachingdb.student TO 'user1'@'localhost';\n"
+        "/**********End**********/"
+    ),
+}
+```
+
+### 获取 challenge_id
+
+```bash
+# 先用 --dry-run 查看未完成的关卡
+python educoder_auto.py --dry-run
+# 输出: 需完成: 创建全文索引 (id=3863547)
+# 这里的 id 就是 challenge_id
+```
+
+### 注意事项
+
+- 首次使用需先在浏览器中手动登录一次（确保 credentials.json 有效）
+- 部分实验可能因平台环境问题（如 `use teachingdb;` 失败）无法自动完成
+- 提交间隔为 2 秒，避免触发平台限流
 
 ## License
 
